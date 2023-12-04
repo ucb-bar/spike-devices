@@ -8,7 +8,7 @@ PREFIX ?= $RISCV/
 
 default: libspikedevices.so
 
-libspikedevices.so: sifive_uart.cc
+libspikedevices.so: sifive_uart.cc blkdev.cc
 	g++ -L $(RISCV)/lib -Wl,-rpath,$(RISCV)/lib -shared -o $@ -std=c++17 -I $(RISCV)/include -fPIC $^
 
 .PHONY: install

@@ -56,7 +56,7 @@ int fdt_parse_sifive_uart(const void *fdt, reg_t *sifive_uart_addr,
 
 // This function parses an instance of this device from the FDT
 // An FDT node for a device should encode, at minimum, the base address for the device
-sifive_uart_t* sifive_uart_parse_from_fdt(const void* fdt, const sim_t* sim, reg_t* base) {
+sifive_uart_t* sifive_uart_parse_from_fdt(const void* fdt, const sim_t* sim, reg_t* base, std::vector<std::string> sargs) {
   if (fdt_parse_sifive_uart(fdt, base, "sifive,uart0") == 0) {
     printf("Found uart at %lx\n", *base);
     return new sifive_uart_t(sim->get_intctrl(), 1);
