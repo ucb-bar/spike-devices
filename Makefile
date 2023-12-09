@@ -5,10 +5,12 @@ $(info Running with RISCV=$(RISCV))
 endif
 
 PREFIX ?= $RISCV/
+SRC_DIR := src
+SRCS=$(wildcard $(SRC_DIR)/*.cc)
 
 default: libspikedevices.so
 
-libspikedevices.so: sifive_uart.cc
+libspikedevices.so: $(SRCS)
 	g++ -L $(RISCV)/lib -Wl,-rpath,$(RISCV)/lib -shared -o $@ -std=c++17 -I $(RISCV)/include -fPIC $^
 
 .PHONY: install
