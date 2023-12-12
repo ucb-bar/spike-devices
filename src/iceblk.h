@@ -19,14 +19,14 @@
 #define BLKDEV_INTERRUPT_ID 2
 #define BLKDEV_SIZE        0x1000
 
-class blockdev_t : public abstract_device_t {
+class iceblk_t : public abstract_device_t {
 public:
-  blockdev_t(
+  iceblk_t(
       const simif_t* sim,
       abstract_interrupt_controller_t *intctrl,
       uint32_t interrupt_id,
       std::vector<std::string> sargs);
-  ~blockdev_t();
+  ~iceblk_t();
   bool load(reg_t addr, size_t len, uint8_t* bytes) override;
   bool store(reg_t addr, size_t len, const uint8_t* bytes) override;
   void tick(reg_t rtc_ticks) override;

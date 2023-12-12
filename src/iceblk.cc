@@ -6,7 +6,7 @@
 #include <stddef.h>
 #include <vector>
 #include <map>
-#include "blkdev.h"
+#include "iceblk.h"
 
 #define BLKDEV_ADDR      0
 #define BLKDEV_OFFSET    8
@@ -34,7 +34,7 @@
   {}
 #endif
 
-blockdev_t::blockdev_t(
+iceblk_t::iceblk_t(
       const simif_t* sim,
       abstract_interrupt_controller_t *intctrl,
       uint32_t interrupt_id,
@@ -80,18 +80,18 @@ blockdev_t::blockdev_t(
   }
 }
 
-blockdev_t::~blockdev_t() {
+iceblk_t::~iceblk_t() {
   free(blockdevice);
 }
 
-void blockdev_t::handle_request() {
+void iceblk_t::handle_request() {
   assert(req_addr % 8 == 0);
   if (req_write) handle_write_request();
   else handle_read_request();
   intctrl->set_interrupt_level(interrupt_id, 1);
 }
 
-void blockdev_t::handle_read_request() {
+void iceblk_t::handle_read_request() {
   mmu_t* simdram = sim->debug_mmu;
   uint64_t data;
   for (reg_t sidx = 0; sidx < req_len; sidx++) {
@@ -102,7 +102,7 @@ void blockdev_t::handle_read_request() {
   }
 }
 
-void blockdev_t::read_blockdevice_u64(uint64_t* data, reg_t sidx, reg_t boff) {
+void iceblk_t::read_blockdevice_u64(uint64_t* data, reg_t sidx, reg_t boff) {
   assert(boff % 8 == 0);
   assert(sidx * BLKDEV_SECTOR_SIZE + boff < blockdevice_size);
   reg_t byte_idx = sidx * BLKDEV_SECTOR_SIZE + boff;
@@ -112,7 +112,7 @@ void blockdev_t::read_blockdevice_u64(uint64_t* data, reg_t sidx, reg_t boff) {
   blkdev_printf("blkdev rd: [%" PRIu64 "]: 0x%" PRIx64 "\n", blkdev_idx, *data);
 }
 
-void blockdev_t::handle_write_request() {
+void iceblk_t::handle_write_request() {
   mmu_t* simdram = sim->debug_mmu;
   for (reg_t sidx = 0; sidx < req_len; sidx++) {
     for (reg_t i = 0; i < BLKDEV_SECTOR_SIZE; i+= 8) {
@@ -122,7 +122,7 @@ void blockdev_t::handle_write_request() {
   }
 }
 
-void blockdev_t::write_blockdevice_u64(uint64_t data, reg_t sidx, reg_t boff) {
+void iceblk_t::write_blockdevice_u64(uint64_t data, reg_t sidx, reg_t boff) {
   reg_t byte_idx = sidx * BLKDEV_SECTOR_SIZE + boff;
   assert(byte_idx < blockdevice_size);
 
@@ -132,12 +132,12 @@ void blockdev_t::write_blockdevice_u64(uint64_t data, reg_t sidx, reg_t boff) {
   blkdev_printf("blkdev wr: [%" PRIu64 "]: 0x%" PRIx64 "\n", blkdev_idx, data);
 }
 
-void blockdev_t::post_request() {
+void iceblk_t::post_request() {
   pending_tags.push(idle_tags.front());
   idle_tags.pop();
 }
 
-bool blockdev_t::load(reg_t addr, size_t len, uint8_t* bytes) {
+bool iceblk_t::load(reg_t addr, size_t len, uint8_t* bytes) {
   if (len > 8) return false;
 
   int tag;
@@ -177,7 +177,7 @@ bool blockdev_t::load(reg_t addr, size_t len, uint8_t* bytes) {
   return true;
 }
 
-bool blockdev_t::store(reg_t addr, size_t len, const uint8_t* bytes) {
+bool iceblk_t::store(reg_t addr, size_t len, const uint8_t* bytes) {
   if (len > 8) return false;
 
   switch (addr) {
@@ -199,7 +199,7 @@ bool blockdev_t::store(reg_t addr, size_t len, const uint8_t* bytes) {
   return true;
 }
 
-void blockdev_t::tick(reg_t rtc_ticks) {
+void iceblk_t::tick(reg_t rtc_ticks) {
   if (++cur_tick % blockdevice_latency == 0) {
     cur_tick = 0;
   }
@@ -238,10 +238,10 @@ int fdt_parse_blkdev(
   return 0;
 }
 
-std::string blockdev_generate_dts(const sim_t* sim) {
+std::string iceblk_generate_dts(const sim_t* sim) {
   std::stringstream s;
   s << std::hex
-    << "    BlkDev: blkdev-controller@" << BLKDEV_BASE << " {\n"
+    << "    iceblk: blkdev-controller@" << BLKDEV_BASE << " {\n"
        "      compatible = \"ucbbar,blkdev\";\n"
        "      interrupt-parent = <&PLIC>;\n"
        "      interrupts = <" << std::dec << BLKDEV_INTERRUPT_ID;
@@ -254,18 +254,18 @@ std::string blockdev_generate_dts(const sim_t* sim) {
   return s.str();
 }
 
-blockdev_t* blockdev_parse_from_fdt(
+iceblk_t* iceblk_parse_from_fdt(
     const void* fdt, const sim_t* sim, reg_t* base,
     std::vector<std::string> sargs)
 {
   uint32_t blkdev_int_id;
   if (fdt_parse_blkdev(fdt, base, &blkdev_int_id, "ucbbar,blkdev") == 0) {
     abstract_interrupt_controller_t* intctrl = sim->get_intctrl();
-    return new blockdev_t(sim, intctrl, blkdev_int_id, sargs);
+    return new iceblk_t(sim, intctrl, blkdev_int_id, sargs);
   } else {
     return nullptr;
   }
 }
 
 
-REGISTER_DEVICE(blockdev, blockdev_parse_from_fdt, blockdev_generate_dts)
+REGISTER_DEVICE(iceblk, iceblk_parse_from_fdt, iceblk_generate_dts)
