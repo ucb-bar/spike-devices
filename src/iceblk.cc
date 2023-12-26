@@ -39,7 +39,7 @@ iceblk_t::iceblk_t(
       abstract_interrupt_controller_t *intctrl,
       uint32_t interrupt_id,
       std::vector<std::string> sargs)
-  : sim(sim), intctrl(intctrl), interrupt_id(interrupt_id)
+  : sim(sim), intctrl(intctrl), interrupt_id(interrupt_id), interrupt_level(INTERRUPT_LO)
 {
   std::map<std::string, std::string> argmap;
 
@@ -84,11 +84,21 @@ iceblk_t::~iceblk_t() {
   free(blockdevice);
 }
 
+void iceblk_t::raise_interrupt() {
+  interrupt_level = INTERRUPT_HI;
+  intctrl->set_interrupt_level(interrupt_id, interrupt_level);
+}
+
+void iceblk_t::lower_interrupt() {
+  interrupt_level = INTERRUPT_LO;
+  intctrl->set_interrupt_level(interrupt_id, interrupt_level);
+}
+
 void iceblk_t::handle_request() {
   assert(req_addr % 8 == 0);
   if (req_write) handle_write_request();
   else handle_read_request();
-  intctrl->set_interrupt_level(interrupt_id, 1);
+  raise_interrupt();
 }
 
 void iceblk_t::handle_read_request() {
@@ -128,6 +138,12 @@ void iceblk_t::write_blockdevice_u64(uint64_t data, reg_t sidx, reg_t boff) {
 
   reg_t bytes_per_elem = sizeof(uint64_t) / sizeof(uint8_t);
   reg_t blkdev_idx = byte_idx / bytes_per_elem;
+
+  if (ckpt_tracking &&
+     (ckpt_block_dev.find(blkdev_idx) == ckpt_block_dev.end())) {
+    ckpt_block_dev[blkdev_idx] = blockdevice[blkdev_idx];
+  }
+
   blockdevice[blkdev_idx] = data;
   blkdev_printf("blkdev wr: [%" PRIu64 "]: 0x%" PRIx64 "\n", blkdev_idx, data);
 }
@@ -161,9 +177,8 @@ bool iceblk_t::load(reg_t addr, size_t len, uint8_t* bytes) {
       // lower interrupt when there is no longer completed reqs
       cmpl_tags.pop();
       idle_tags.push(tag);
-      if ((int)cmpl_tags.size() == 0) {
-        intctrl->set_interrupt_level(interrupt_id, 0);
-      }
+      if ((int)cmpl_tags.size() == 0)
+        lower_interrupt();
       break;
     case BLKDEV_NSECTORS:
       read_little_endian_reg((int)(blockdevice_size / BLKDEV_SECTOR_SIZE), 0, len, bytes);
@@ -209,6 +224,44 @@ void iceblk_t::tick(reg_t rtc_ticks) {
   handle_request();
   cmpl_tags.push(pending_tags.front());
   pending_tags.pop();
+}
+
+void iceblk_t::set_ckpt() {
+  ckpt_tracking = true;
+  ckpt_cur_tick = cur_tick;
+  ckpt_interrupt_level = interrupt_level;
+
+  ckpt_idle_tags = idle_tags;
+  ckpt_pending_tags = pending_tags;
+  ckpt_cmpl_tags = cmpl_tags;
+
+  ckpt_req_addr   = req_addr;
+  ckpt_req_offset = req_offset;
+  ckpt_req_len    = req_len;
+  ckpt_req_write  = req_write;
+
+  ckpt_block_dev.clear();
+}
+
+void iceblk_t::load_ckpt() {
+  ckpt_tracking = false;
+
+  cur_tick = ckpt_cur_tick;
+  interrupt_level = ckpt_interrupt_level;
+
+  idle_tags = ckpt_idle_tags;
+  pending_tags = ckpt_pending_tags;
+  cmpl_tags = ckpt_cmpl_tags;
+
+  req_addr = ckpt_req_addr;
+  req_offset = ckpt_req_offset;
+  req_len = ckpt_req_len;
+  req_write = ckpt_req_write;
+
+  for (auto st : ckpt_block_dev) {
+    blockdevice[st.first] = st.second;
+  }
+  ckpt_block_dev.clear();
 }
 
 int fdt_parse_blkdev(
