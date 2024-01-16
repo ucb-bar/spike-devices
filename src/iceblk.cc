@@ -215,12 +215,7 @@ bool iceblk_t::store(reg_t addr, size_t len, const uint8_t* bytes) {
 }
 
 void iceblk_t::tick(reg_t rtc_ticks) {
-  if (++cur_tick % blockdevice_latency == 0) {
-    cur_tick = 0;
-  }
-
-  if (cur_tick > 0 || pending_tags.empty()) return;
-
+  if (pending_tags.empty()) return;
   handle_request();
   cmpl_tags.push(pending_tags.front());
   pending_tags.pop();
@@ -228,7 +223,6 @@ void iceblk_t::tick(reg_t rtc_ticks) {
 
 void iceblk_t::set_ckpt() {
   ckpt_tracking = true;
-  ckpt_cur_tick = cur_tick;
   ckpt_interrupt_level = interrupt_level;
 
   ckpt_idle_tags = idle_tags;
@@ -245,8 +239,6 @@ void iceblk_t::set_ckpt() {
 
 void iceblk_t::load_ckpt() {
   ckpt_tracking = false;
-
-  cur_tick = ckpt_cur_tick;
   interrupt_level = ckpt_interrupt_level;
 
   idle_tags = ckpt_idle_tags;

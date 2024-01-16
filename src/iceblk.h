@@ -50,7 +50,6 @@ private:
 
 private:
   const uint64_t blockdevice_latency = 500;
-  uint64_t cur_tick = 0;
   uint64_t* blockdevice;
   uint64_t blockdevice_size;
 
@@ -73,7 +72,6 @@ private:
   // checkpointing stuff
 private:
   bool ckpt_tracking = false;
-  uint64_t ckpt_cur_tick = 0;
 
   std::map<reg_t, uint64_t> ckpt_block_dev;
   uint32_t ckpt_interrupt_level;
