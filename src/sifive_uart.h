@@ -7,6 +7,10 @@
 #include <fesvr/term.h>
 #include <fdt/libfdt.h>
 
+#define UART_BASE         0x10020000
+#define UART_INTERRUPT_ID 2
+#define UART_SIZE         0x1000
+
 #define UART_TXFIFO (0x00)
 #define UART_RXFIFO (0x04)
 #define UART_TXCTRL (0x08)
@@ -73,7 +77,11 @@ private:
         ((ie & UART_IE_RXWM) && rx_fifo.size())) {
       cond = 1;
     }
-    intctrl->set_interrupt_level(interrupt_id, (cond) ? 1 : 0);
+    if (cond) {
+      intctrl->submit_external_interrupt(interrupt_id);
+    } else {
+      intctrl->lower_external_interrupt(interrupt_id);
+    }
   }
 };
 

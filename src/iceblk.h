@@ -16,7 +16,7 @@
 #include <fdt/libfdt.h>
 
 #define BLKDEV_BASE         0x10015000
-#define BLKDEV_INTERRUPT_ID 2
+#define BLKDEV_INTERRUPT_ID 1
 #define BLKDEV_SIZE        0x1000
 
 #define INTERRUPT_LO 0
@@ -33,8 +33,8 @@ public:
   bool load(reg_t addr, size_t len, uint8_t* bytes) override;
   bool store(reg_t addr, size_t len, const uint8_t* bytes) override;
   void tick(reg_t rtc_ticks) override;
-  void set_ckpt() override;
-  void load_ckpt() override;
+/* void set_ckpt() override; */
+/* void load_ckpt() override; */
 
 private:
   void raise_interrupt();
