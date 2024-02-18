@@ -156,7 +156,7 @@ void iceblk_t::post_request() {
 bool iceblk_t::load(reg_t addr, size_t len, uint8_t* bytes) {
   if (len > 8) return false;
 
-  printf("iceblk load: 0x%" PRIx64 " len: %u\n", addr, len);
+/* printf("iceblk load: 0x%" PRIx64 " len: %u\n", addr, len); */
 
   int tag;
   switch (addr) {
@@ -197,7 +197,7 @@ bool iceblk_t::load(reg_t addr, size_t len, uint8_t* bytes) {
 bool iceblk_t::store(reg_t addr, size_t len, const uint8_t* bytes) {
   if (len > 8) return false;
 
-  printf("iceblk store: 0x%" PRIx64 " len: %u\n", addr, len);
+/* printf("iceblk store: 0x%" PRIx64 " len: %u\n", addr, len); */
 
   switch (addr) {
     case BLKDEV_ADDR:
