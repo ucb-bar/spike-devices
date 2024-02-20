@@ -33,8 +33,8 @@ public:
   bool load(reg_t addr, size_t len, uint8_t* bytes) override;
   bool store(reg_t addr, size_t len, const uint8_t* bytes) override;
   void tick(reg_t rtc_ticks) override;
-/* void set_ckpt() override; */
-/* void load_ckpt() override; */
+  void serialize_proto(void* msg, void* arena) override;
+  void deserialize_proto(void* msg) override;
 
 private:
   void raise_interrupt();

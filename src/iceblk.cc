@@ -225,40 +225,40 @@ void iceblk_t::tick(reg_t rtc_ticks) {
   pending_tags.pop();
 }
 
-/* void iceblk_t::set_ckpt() { */
-/* ckpt_tracking = true; */
-/* ckpt_interrupt_level = interrupt_level; */
+void iceblk_t::serialize_proto(void* msg, void* arena) {
+  ckpt_tracking = true;
+  ckpt_interrupt_level = interrupt_level;
 
-/* ckpt_idle_tags = idle_tags; */
-/* ckpt_pending_tags = pending_tags; */
-/* ckpt_cmpl_tags = cmpl_tags; */
+  ckpt_idle_tags = idle_tags;
+  ckpt_pending_tags = pending_tags;
+  ckpt_cmpl_tags = cmpl_tags;
 
-/* ckpt_req_addr   = req_addr; */
-/* ckpt_req_offset = req_offset; */
-/* ckpt_req_len    = req_len; */
-/* ckpt_req_write  = req_write; */
+  ckpt_req_addr   = req_addr;
+  ckpt_req_offset = req_offset;
+  ckpt_req_len    = req_len;
+  ckpt_req_write  = req_write;
 
-/* ckpt_block_dev.clear(); */
-/* } */
+  ckpt_block_dev.clear();
+}
 
-/* void iceblk_t::load_ckpt() { */
-/* ckpt_tracking = false; */
-/* interrupt_level = ckpt_interrupt_level; */
+void iceblk_t::deserialize_proto(void* msg) {
+  ckpt_tracking = false;
+  interrupt_level = ckpt_interrupt_level;
 
-/* idle_tags = ckpt_idle_tags; */
-/* pending_tags = ckpt_pending_tags; */
-/* cmpl_tags = ckpt_cmpl_tags; */
+  idle_tags = ckpt_idle_tags;
+  pending_tags = ckpt_pending_tags;
+  cmpl_tags = ckpt_cmpl_tags;
 
-/* req_addr = ckpt_req_addr; */
-/* req_offset = ckpt_req_offset; */
-/* req_len = ckpt_req_len; */
-/* req_write = ckpt_req_write; */
+  req_addr = ckpt_req_addr;
+  req_offset = ckpt_req_offset;
+  req_len = ckpt_req_len;
+  req_write = ckpt_req_write;
 
-/* for (auto st : ckpt_block_dev) { */
-/* blockdevice[st.first] = st.second; */
-/* } */
-/* ckpt_block_dev.clear(); */
-/* } */
+  for (auto st : ckpt_block_dev) {
+    blockdevice[st.first] = st.second;
+  }
+  ckpt_block_dev.clear();
+}
 
 int fdt_parse_blkdev(
     const void *fdt,
