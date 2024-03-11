@@ -32,9 +32,9 @@ bool sifive_uart_t::store(reg_t addr, size_t len, const uint8_t* bytes) {
 
 void sifive_uart_t::tick(reg_t UNUSED rtc_ticks) {
   if (rx_fifo.size() >= UART_RX_FIFO_SIZE) return;
-  int rc = canonical_terminal_t::read();
-  if (rc < 0) return;
-  rx_fifo.push((uint8_t)rc);
+/* int rc = canonical_terminal_t::read(); */
+/* if (rc < 0) return; */
+/* rx_fifo.push((uint8_t)rc); */
   update_interrupts();
 }
 
