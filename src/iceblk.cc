@@ -259,7 +259,10 @@ iceblk_t* iceblk_parse_from_fdt(
     std::vector<std::string> sargs)
 {
   uint32_t blkdev_int_id;
-  if (fdt_parse_blkdev(fdt, base, &blkdev_int_id, "ucb-bar,blkdev") == 0) {
+  if (
+    fdt_parse_blkdev(fdt, base, &blkdev_int_id, "ucb-bar,blkdev") == 0 ||
+    fdt_parse_blkdev(fdt, base, &blkdev_int_id, "ucbbar,blkdev") == 0
+  ) {
     abstract_interrupt_controller_t* intctrl = sim->get_intctrl();
     return new iceblk_t(sim, intctrl, blkdev_int_id, sargs);
   } else {
