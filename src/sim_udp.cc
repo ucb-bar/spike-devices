@@ -1,19 +1,49 @@
 #include "sim_udp.h"
 
+
+void sim_udp_t::write_udp_tx() {
+  printf("<SimUDP> [INFO]: Writing UDP TX with DMA pointer: 0x%lx, DMA size: %d\n", tx_fifo, reg_tx_size);
+  printf("addr: %x, port: %x\n", reg_addr_ip, reg_addr_tx_port);
+  sendto(udp->sockfd, (uint8_t *)tx_fifo, reg_tx_size, 0, (const struct sockaddr *)&udp->host_addr, sizeof(udp->host_addr));
+}
+
+void sim_udp_t::create_udp_tx() {
+  udp = (UDPRx *)malloc(sizeof(UDPRx));
+
+  memset(&udp->client_addr, 0, sizeof(udp->client_addr));
+  memset(&udp->host_addr, 0, sizeof(udp->host_addr));
+
+  // host ip
+  udp->host_addr.sin_family = AF_INET;
+  udp->host_addr.sin_addr.s_addr = htonl(reg_addr_ip);
+  udp->host_addr.sin_port = htons(reg_addr_tx_port);
+
+
+  // Create socket file descriptor
+  if ((udp->sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+    printf("<SimUDP> [ERROR]: socket creation failed\n");
+  }
+
+  // if (bind(udp->sockfd, (const struct sockaddr *)&udp->host_addr, sizeof(udp->host_addr)) < 0) {
+  //   printf("<SimUDP> [ERROR]: bind failed\n");
+  // }
+
+  // Create a thread running the receive() function
+
+  printf("<SimUDP> [INFO]: Tx thread created, thread ID: %ld\n", (long)udp->thread_id);
+
+}
+
+
 bool sim_udp_t::load(reg_t addr, size_t len, uint8_t* bytes) {
   if (addr >= 0x1000 || len > 4) return false;
   uint32_t r = 0;
   switch (addr) {
-  case UART_TXFIFO: r = 0x0          ; break;
-  case UART_RXFIFO: r = read_rxfifo(); break;
-  case UART_TXCTRL: r = txctrl       ; break;
-  case UART_RXCTRL: r = rxctrl       ; break;
-  case UART_IE:     r = ie           ; break;
-  case UART_IP:     r = read_ip()    ; break;
-  case UART_DIV:    r = div          ; break;
-  case ETH_ADDR_IP: r = reg_addr_ip  ; break;
-  case ETH_ADDR_PORT: r = reg_addr_port; break;
-  default: printf("LOAD -- ADDR=0x%lx LEN=%lu\n", addr, len); abort();
+    case UDP_IP:      r = reg_addr_ip;      break;
+    case UDP_RXPORT:  r = reg_addr_rx_port; break;
+    case UDP_TXPORT:  r = reg_addr_tx_port; break;
+    case UDP_RXSIZE:  r = reg_rx_size;      break;
+    default: printf("LOAD -- ADDR=0x%lx LEN=%lu\n", addr, len); abort();
   }
   memcpy(bytes, &r, len);
   return true;
@@ -21,21 +51,29 @@ bool sim_udp_t::load(reg_t addr, size_t len, uint8_t* bytes) {
 
 
 bool sim_udp_t::store(reg_t addr, size_t len, const uint8_t* bytes) {
+  printf("STORE -- ADDR=0x%lx LEN=%lu\n", addr, len);
+  
   if (addr >= 0x1000 || len > 4) return false;
+  
+  if (addr >= UDP_TXFIFO) {
+    tx_fifo[addr - UDP_TXFIFO] = bytes[0];
+    return true;
+  }
   switch (addr) {
-  case UART_TXFIFO: canonical_terminal_t::write(*bytes); return true;
-  case UART_TXCTRL: memcpy(&txctrl, bytes, len); return true;
-  case UART_RXCTRL: memcpy(&rxctrl, bytes, len); return true;
-  case UART_IE:     memcpy(&ie, bytes, len); update_interrupts(); return true;
-  case UART_DIV:    memcpy(&div, bytes, len); return true;
-  case ETH_ADDR_IP: memcpy(&reg_addr_ip, bytes, len); return true;
-  case ETH_ADDR_PORT: memcpy(&reg_addr_port, bytes, len); return true;
-  default: printf("STORE -- ADDR=0x%lx LEN=%lu\n", addr, len); abort();
+    case UDP_IP:      reg_addr_ip       = *((uint32_t *)bytes); return true;
+    case UDP_RXPORT:  reg_addr_rx_port  = *((uint16_t *)bytes); return true;
+    case UDP_TXPORT:  reg_addr_tx_port  = *((uint16_t *)bytes); return true;
+    case UDP_TXCTRL:
+      if (bytes[0] == 1) write_udp_tx();
+      if (bytes[0] == 2) create_udp_tx();
+      return true;
+    case UDP_TXSIZE:  reg_tx_size       = *((uint32_t *)bytes); return true;
+    default: printf("STORE -- ADDR=0x%lx LEN=%lu\n", addr, len); abort();
   }
 }
 
 void sim_udp_t::tick(reg_t UNUSED rtc_ticks) {
-  if (rx_fifo.size() >= UART_RX_FIFO_SIZE) return;
+  if (rx_fifo.size() >= 1) return;
   int rc = canonical_terminal_t::read();
   if (rc < 0) return;
   rx_fifo.push((uint8_t)rc);
