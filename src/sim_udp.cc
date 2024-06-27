@@ -38,6 +38,8 @@ void sim_udp_t::udp_receive() {
           ntohs(this->udp.rx_addr.sin_port),
           n
           );
+
+        this->reg_rxsize = n;
       }
     }
   }
