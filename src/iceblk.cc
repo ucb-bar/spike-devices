@@ -238,7 +238,7 @@ int fdt_parse_blkdev(
   return 0;
 }
 
-std::string iceblk_generate_dts(const sim_t* sim) {
+std::string iceblk_generate_dts(const sim_t* sim, const std::vector<std::string>& args) {
   std::stringstream s;
   s << std::hex
     << "    iceblk: blkdev-controller@" << BLKDEV_BASE << " {\n"
