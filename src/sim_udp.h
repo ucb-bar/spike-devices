@@ -36,6 +36,9 @@
 #define UDP_TXFIFO_VALID    0x34
 #define UDP_TXFIFO_READY    0x38
 
+#define UDP_RX_STATUS       0x40
+#define UDP_TX_STATUS       0x42
+
 
 typedef struct {
   int sockfd;
@@ -75,6 +78,8 @@ private:
   uint8_t enabled;
   uint8_t rx_flag;
   uint8_t tx_flag;
+  uint8_t rx_status;
+  uint8_t tx_status;
 
   void udp_create_socket();
   void udp_enable();
@@ -82,22 +87,6 @@ private:
   void udp_set_tx_flag();
   void udp_receive();
   void udp_send();
-  // uint32_t read_rxfifo() {
-  //   if (!rx_fifo.size()) return 0x80000000;
-  //   uint8_t r = rx_fifo.front();
-  //   rx_fifo.pop();
-  //   update_interrupts();
-  //   return r;
-  // }
-
-  // void update_interrupts() {
-  //   int cond = 0;
-  //   if ((ie) ||
-  //       ((ie) && rx_fifo.size())) {
-  //     cond = 1;
-  //   }
-  //   intctrl->set_interrupt_level(interrupt_id, (cond) ? 1 : 0);
-  // }
 };
 
 #endif  // _SIM_UDP_H

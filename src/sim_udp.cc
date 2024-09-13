@@ -24,7 +24,9 @@ sim_udp_t::sim_udp_t(abstract_interrupt_controller_t *intctrl, reg_t int_id) {
 
   rx_thread.detach();
   tx_thread.detach();
-    
+
+  this->rx_status = 0x00;
+  this->tx_status = 0x00;
 }
 
 void sim_udp_t::udp_receive() {
@@ -52,6 +54,8 @@ void sim_udp_t::udp_receive() {
         );
         this->reg_rxsize = n;
       }
+
+      this->rx_status = 0x01;
     }
   }
 }
@@ -74,6 +78,8 @@ void sim_udp_t::udp_send() {
       for (int i = 0; i < this->reg_txsize; i++) {
         this->tx_fifo.pop();
       }
+
+      this->tx_status = 0x01;
     }
   }
 }
@@ -116,6 +122,12 @@ bool sim_udp_t::load(reg_t addr, size_t len, uint8_t* bytes) {
       break;
     case UDP_TXFIFO_READY:
       r = 1;
+      break;
+    case UDP_RX_STATUS:
+      r = this->rx_status;
+      break;
+    case UDP_TX_STATUS:
+      r = this->tx_status;
       break;
     default: printf("LOAD -- ADDR=0x%lx LEN=%lu\n", addr, len); abort();
   }
@@ -175,6 +187,14 @@ bool sim_udp_t::store(reg_t addr, size_t len, const uint8_t* bytes) {
     
     case UDP_TXFIFO_VALID:
       this->tx_fifo.push(this->tx_fifo_to_push);
+      return true;
+    
+    case UDP_RX_STATUS:
+      this->rx_status = 0x00;
+      return true;
+    
+    case UDP_TX_STATUS:
+      this->tx_status = 0x00;
       return true;
 
     default: printf("STORE -- ADDR=0x%lx LEN=%lu\n", addr, len); abort();
