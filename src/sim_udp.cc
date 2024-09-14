@@ -38,15 +38,17 @@ void sim_udp_t::udp_receive() {
   while (1) {
     if (this->rx_flag) {
       socklen_t len = sizeof(this->udp.rx_addr);
+      printf("UDP_RXPORT: %d\n", ntohs(this->udp.rx_addr.sin_port));
       int n = recvfrom(this->udp.sockfd, (void *)this->rx_buffer, this->reg_rxsize, MSG_WAITALL, (struct sockaddr *)&this->udp.rx_addr, &len);
-
+      printf("UDP_RXPORT: %d\n", ntohs(this->udp.rx_addr.sin_port));
       if (n) {
         rx_fifo_mutex.lock();
         for (int i = 0; i < this->reg_rxsize; i++) {
           this->rx_fifo.push(this->rx_buffer[i]);
         }
         rx_fifo_mutex.unlock();
-        
+
+        printf("UDP_RXPORT: %d\n", ntohs(this->udp.rx_addr.sin_port));
         printf("<SimUDP> [INFO]: UDP Rx from (%s, %d) with data size: %d\n", 
           inet_ntoa(this->udp.rx_addr.sin_addr),
           ntohs(this->udp.rx_addr.sin_port),
@@ -56,8 +58,8 @@ void sim_udp_t::udp_receive() {
         printf("\n");
         this->reg_rxsize = n;
         this->reg_rx_status = 0x01;
+        this->rx_flag = 0;
       }
-
     }
   }
 }
@@ -81,10 +83,13 @@ void sim_udp_t::udp_send() {
       );
 
       for (int i = 0; i < this->reg_txsize; i++) {
+        printf("%c", this->tx_fifo.front());
         this->tx_fifo.pop();
       }
+      printf("\n");
 
       this->reg_tx_status = 0x01;
+      this->tx_flag = 0;
     }
   }
 }
@@ -138,7 +143,7 @@ bool sim_udp_t::load(reg_t addr, size_t len, uint8_t* bytes) {
     default: printf("LOAD -- ADDR=0x%lx LEN=%lu\n", addr, len); abort();
   }
   memcpy(bytes, &r, len);
-  printf("LOAD -- ADDR=0x%lx LEN=%lu DATA=%lx\n", addr, len, r);
+  // printf("LOAD -- ADDR=0x%lx LEN=%lu DATA=%lx\n", addr, len, r);
   return true;
 }
 
@@ -166,6 +171,7 @@ bool sim_udp_t::store(reg_t addr, size_t len, const uint8_t* bytes) {
     case UDP_TXPORT:
       this->udp.tx_addr.sin_port = *((uint16_t *)bytes);
       printf("UDP_TXPORT: %d\n", ntohs(this->udp.tx_addr.sin_port));
+      printf("UDP_RXPORT: %d\n", ntohs(this->udp.rx_addr.sin_port));
       return true;
     
     case UDP_CTRL:
