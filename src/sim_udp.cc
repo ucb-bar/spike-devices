@@ -34,9 +34,7 @@ void sim_udp_t::udp_receive() {
   printf("<SimUDP> [INFO]: UDP Rx thread started\n");
 
   socklen_t len = sizeof(this->udp.rx_addr);
-
-  printf("here\n");
-
+  
   while (1) {
     if (this->rx_flag) {
       socklen_t len = sizeof(this->udp.rx_addr);
@@ -61,6 +59,9 @@ void sim_udp_t::udp_receive() {
 }
 
 void sim_udp_t::udp_send() {
+
+  printf("<SimUDP> [INFO]: UDP Tx thread started\n");
+
   while (1) {
     if (this->tx_flag) {
       printf("<SimUDP> [INFO]: UDP Tx to (%s, %d) with data size: %d\n", 
@@ -231,14 +232,14 @@ int SimUDP_parseFDT(const void *fdt, reg_t *address,
 // An FDT node for a device should encode, at minimum, the base address for the device
 sim_udp_t* SimUDP_parseFromFDT(const void* fdt, const sim_t* sim, reg_t* base, std::vector<std::string> sargs) {
   if (SimUDP_parseFDT(fdt, base, "ucbbar,sim_udp") == 0) {
-    printf("Found SimUDP at %lx\n", *base);
+    printf("Found SimUDP at 0x%lx\n", *base);
     return new sim_udp_t(sim->get_intctrl(), 1);
   } else {
     return nullptr;
   }
 }
 
-std::string SimUDP_generateDTS(const sim_t* sim) {
+std::string SimUDP_generateDTS(const sim_t* sim, const std::vector<std::string>& args) {
   std::stringstream s;
   s << std::hex
     << "    udp: udp@" << UDP_BASE << " {\n"

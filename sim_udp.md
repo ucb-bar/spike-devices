@@ -92,7 +92,7 @@ void UDP_enable() {
 }
 ```
 ```
-void UDP_config_recv(size){
+void UDP_config_recv_size(uint32_t size){
     regwrite32(rx_size, size);
 }
 ```
