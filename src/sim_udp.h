@@ -15,7 +15,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <thread>
-
+#include <mutex>
 #define UDP_BASE          0x10001000
 #define UDP_SIZE          0x1000
     
@@ -37,7 +37,7 @@
 #define UDP_TXFIFO_READY    0x38
 
 #define UDP_RX_STATUS       0x40
-#define UDP_TX_STATUS       0x42
+#define UDP_TX_STATUS       0x44
 
 
 typedef struct {
@@ -63,7 +63,9 @@ private:
   uint8_t rx_buffer[256];
   uint8_t tx_buffer[256];
   std::queue<uint8_t> rx_fifo;
+  std::mutex rx_fifo_mutex;
   std::queue<uint8_t> tx_fifo;
+  std::mutex tx_fifo_mutex;
   uint8_t rx_fifo_to_pop;
   uint8_t tx_fifo_to_push;
   
@@ -75,11 +77,12 @@ private:
 
   UDPSocket udp;
 
+  uint8_t reg_rx_status;
+  uint8_t reg_tx_status;
+
   uint8_t enabled;
   uint8_t rx_flag;
   uint8_t tx_flag;
-  uint8_t rx_status;
-  uint8_t tx_status;
 
   void udp_create_socket();
   void udp_enable();

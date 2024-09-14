@@ -25,8 +25,8 @@ sim_udp_t::sim_udp_t(abstract_interrupt_controller_t *intctrl, reg_t int_id) {
   rx_thread.detach();
   tx_thread.detach();
 
-  this->rx_status = 0x00;
-  this->tx_status = 0x00;
+  this->reg_rx_status = 0x00;
+  this->reg_tx_status = 0x00;
 }
 
 void sim_udp_t::udp_receive() {
@@ -39,21 +39,25 @@ void sim_udp_t::udp_receive() {
     if (this->rx_flag) {
       socklen_t len = sizeof(this->udp.rx_addr);
       int n = recvfrom(this->udp.sockfd, (void *)this->rx_buffer, this->reg_rxsize, MSG_WAITALL, (struct sockaddr *)&this->udp.rx_addr, &len);
-      
-      for (int i = 0; i < this->reg_rxsize; i++) {
-        this->rx_fifo.push(this->rx_buffer[i]);
-      }
 
       if (n) {
+        rx_fifo_mutex.lock();
+        for (int i = 0; i < this->reg_rxsize; i++) {
+          this->rx_fifo.push(this->rx_buffer[i]);
+        }
+        rx_fifo_mutex.unlock();
+        
         printf("<SimUDP> [INFO]: UDP Rx from (%s, %d) with data size: %d\n", 
           inet_ntoa(this->udp.rx_addr.sin_addr),
           ntohs(this->udp.rx_addr.sin_port),
           n
         );
+
+        printf("\n");
         this->reg_rxsize = n;
+        this->reg_rx_status = 0x01;
       }
 
-      this->rx_status = 0x01;
     }
   }
 }
@@ -80,7 +84,7 @@ void sim_udp_t::udp_send() {
         this->tx_fifo.pop();
       }
 
-      this->tx_status = 0x01;
+      this->reg_tx_status = 0x01;
     }
   }
 }
@@ -110,13 +114,13 @@ void sim_udp_t::udp_set_tx_flag() {
 }
 
 bool sim_udp_t::load(reg_t addr, size_t len, uint8_t* bytes) {
-  printf("LOAD -- ADDR=0x%lx LEN=%lu\n", addr, len);
   if (addr >= 0x1000 || len > 4) return false;
   uint32_t r = 0;
   switch (addr) {
     case UDP_RXFIFO_DATA:
+      rx_fifo_mutex.lock();
       r = this->rx_fifo.front();
-      this->rx_fifo_to_pop = r;
+      rx_fifo_mutex.unlock();
       break;
     case UDP_RXFIFO_VALID:
       r = this->rx_fifo.size() > 0;
@@ -125,37 +129,43 @@ bool sim_udp_t::load(reg_t addr, size_t len, uint8_t* bytes) {
       r = 1;
       break;
     case UDP_RX_STATUS:
-      r = this->rx_status;
+      r = this->reg_rx_status;
+      // printf("UDP_RX_STATUS: %d\n", r);
       break;
     case UDP_TX_STATUS:
-      r = this->tx_status;
+      r = this->reg_tx_status;
       break;
     default: printf("LOAD -- ADDR=0x%lx LEN=%lu\n", addr, len); abort();
   }
   memcpy(bytes, &r, len);
+  printf("LOAD -- ADDR=0x%lx LEN=%lu DATA=%lx\n", addr, len, r);
   return true;
 }
 
 bool sim_udp_t::store(reg_t addr, size_t len, const uint8_t* bytes) {
-  printf("STORE -- ADDR=0x%lx LEN=%lu DATA=%lx\n", addr, len, *(uint32_t *)bytes);
+  // printf("STORE -- ADDR=0x%lx LEN=%lu DATA=%lx\n", addr, len, *(uint32_t *)bytes);
   
   if (addr >= 0x1000 || len > 4) return false;
   
   switch (addr) {
     case UDP_RXIP:
       this->udp.rx_addr.sin_addr.s_addr = *((uint32_t *)bytes);
+      printf("UDP_RXIP: %s\n", inet_ntoa(this->udp.rx_addr.sin_addr));
       return true;
 
     case UDP_TXIP:
       this->udp.tx_addr.sin_addr.s_addr = *((uint32_t *)bytes);
+      printf("UDP_TXIP: %s\n", inet_ntoa(this->udp.tx_addr.sin_addr));
       return true;
     
     case UDP_RXPORT: 
       this->udp.rx_addr.sin_port = *((uint16_t *)bytes);
+      printf("UDP_RXPORT: %d\n", ntohs(this->udp.rx_addr.sin_port));
       return true;
     
     case UDP_TXPORT:
       this->udp.tx_addr.sin_port = *((uint16_t *)bytes);
+      printf("UDP_TXPORT: %d\n", ntohs(this->udp.tx_addr.sin_port));
       return true;
     
     case UDP_CTRL:
@@ -179,7 +189,9 @@ bool sim_udp_t::store(reg_t addr, size_t len, const uint8_t* bytes) {
       return true;
     
     case UDP_RXFIFO_READY:
+      rx_fifo_mutex.lock();
       this->rx_fifo.pop();
+      rx_fifo_mutex.unlock();
       return true;
 
     case UDP_TXFIFO_DATA:
@@ -191,11 +203,11 @@ bool sim_udp_t::store(reg_t addr, size_t len, const uint8_t* bytes) {
       return true;
     
     case UDP_RX_STATUS:
-      this->rx_status = 0x00;
+      this->reg_rx_status = 0x00;
       return true;
     
     case UDP_TX_STATUS:
-      this->tx_status = 0x00;
+      this->reg_tx_status = 0x00;
       return true;
 
     default: printf("STORE -- ADDR=0x%lx LEN=%lu\n", addr, len); abort();
