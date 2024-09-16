@@ -16,6 +16,16 @@
 #include <arpa/inet.h>
 #include <thread>
 #include <mutex>
+
+
+/* ================ Bit Operation definitions ================ */
+#define SET_BITS(REG, BIT)                    ((REG) |= (BIT))
+#define CLEAR_BITS(REG, BIT)                  ((REG) &= ~(BIT))
+#define READ_BITS(REG, BIT)                   ((REG) & (BIT))
+#define WRITE_BITS(REG, CLEARMASK, SETMASK)   ((REG) = (((REG) & (~(CLEARMASK))) | (SETMASK)))
+
+
+
 #define UDP_BASE          0x10001000
 #define UDP_SIZE          0x1000
     
@@ -29,15 +39,18 @@
 #define UDP_TXSIZE        0x1C
 
 #define UDP_RXFIFO_DATA     0x20
-#define UDP_RXFIFO_VALID    0x24
+#define UDP_RXFIFO_SIZE     0x24
 #define UDP_RXFIFO_READY    0x28
 
 #define UDP_TXFIFO_DATA     0x30
-#define UDP_TXFIFO_VALID    0x34
+#define UDP_TXFIFO_SIZE     0x34
 #define UDP_TXFIFO_READY    0x38
 
 #define UDP_RX_STATUS       0x40
 #define UDP_TX_STATUS       0x44
+
+
+#define FIFO_SIZE  16
 
 
 typedef struct {
@@ -60,8 +73,8 @@ private:
   uint32_t reg_status;
   uint32_t reg_rxsize;
   uint32_t reg_txsize;
-  uint8_t rx_buffer[256];
-  uint8_t tx_buffer[256];
+  uint8_t rx_buffer[FIFO_SIZE];
+  uint8_t tx_buffer[FIFO_SIZE];
   std::queue<uint8_t> rx_fifo;
   std::mutex rx_fifo_mutex;
   std::queue<uint8_t> tx_fifo;
@@ -84,12 +97,11 @@ private:
   uint8_t rx_flag;
   uint8_t tx_flag;
 
-  void udp_create_socket();
   void udp_enable();
   void udp_set_rx_flag();
   void udp_set_tx_flag();
-  void udp_receive();
-  void udp_send();
+  void udp_receive_handler();
+  void udp_send_handler();
 };
 
 #endif  // _SIM_UDP_H

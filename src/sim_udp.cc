@@ -17,10 +17,17 @@ sim_udp_t::sim_udp_t(abstract_interrupt_controller_t *intctrl, reg_t int_id) {
   this->rx_flag = 0;
   this->tx_flag = 0;
 
-  this->udp_create_socket();  
-  
-  std::thread rx_thread(&sim_udp_t::udp_receive, this);
-  std::thread tx_thread(&sim_udp_t::udp_send, this);
+
+  // Create socket file descriptor
+  this->udp.sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+
+  if (this->udp.sockfd < 0) {
+    printf("<SimUDP> [ERROR]: socket creation failed\n");
+    exit(1);
+  }
+
+  std::thread rx_thread(&sim_udp_t::udp_receive_handler, this);
+  std::thread tx_thread(&sim_udp_t::udp_send_handler, this);
 
   rx_thread.detach();
   tx_thread.detach();
@@ -29,64 +36,51 @@ sim_udp_t::sim_udp_t(abstract_interrupt_controller_t *intctrl, reg_t int_id) {
   this->reg_tx_status = 0x00;
 }
 
-void sim_udp_t::udp_receive() {
-
+void sim_udp_t::udp_receive_handler() {
   printf("<SimUDP> [INFO]: UDP Rx thread started\n");
 
-  socklen_t len = sizeof(this->udp.rx_addr);
-  
   while (1) {
     if (this->rx_flag) {
-      socklen_t len = sizeof(this->udp.rx_addr);
-      printf("UDP_RXPORT: %d\n", ntohs(this->udp.rx_addr.sin_port));
-      int n = recvfrom(this->udp.sockfd, (void *)this->rx_buffer, this->reg_rxsize, MSG_WAITALL, (struct sockaddr *)&this->udp.rx_addr, &len);
-      printf("UDP_RXPORT: %d\n", ntohs(this->udp.rx_addr.sin_port));
+      int n = recvfrom(this->udp.sockfd, (void *)this->rx_buffer, this->reg_rxsize, MSG_WAITALL, NULL, 0);
+      
       if (n) {
         rx_fifo_mutex.lock();
-        for (int i = 0; i < this->reg_rxsize; i++) {
+        for (int i = 0; i < n; i += 1) {
           this->rx_fifo.push(this->rx_buffer[i]);
         }
         rx_fifo_mutex.unlock();
 
-        printf("UDP_RXPORT: %d\n", ntohs(this->udp.rx_addr.sin_port));
-        printf("<SimUDP> [INFO]: UDP Rx from (%s, %d) with data size: %d\n", 
-          inet_ntoa(this->udp.rx_addr.sin_addr),
-          ntohs(this->udp.rx_addr.sin_port),
-          n
-        );
-
-        printf("\n");
         this->reg_rxsize = n;
         this->reg_rx_status = 0x01;
+        
         this->rx_flag = 0;
       }
     }
   }
 }
 
-void sim_udp_t::udp_send() {
+void sim_udp_t::udp_send_handler() {
 
   printf("<SimUDP> [INFO]: UDP Tx thread started\n");
 
   while (1) {
-    if (this->tx_flag) {
+    if (this->tx_flag && this->tx_fifo.size() >= this->reg_txsize) {
       printf("<SimUDP> [INFO]: UDP Tx to (%s, %d) with data size: %d\n", 
-          inet_ntoa(this->udp.tx_addr.sin_addr),
-      ntohs(this->udp.tx_addr.sin_port),
-      this->reg_txsize
+        inet_ntoa(this->udp.tx_addr.sin_addr),
+        ntohs(this->udp.tx_addr.sin_port),
+        this->reg_txsize
       );
-  
+
+      for (int i = 0; i < this->reg_txsize; i += 1) {
+        this->tx_buffer[i] = this->tx_fifo.front();
+        this->tx_fifo.pop();
+      }
+
       sendto(
         this->udp.sockfd,
         (uint8_t *)this->tx_buffer, this->reg_txsize, 0,
         (const struct sockaddr *)&this->udp.tx_addr, sizeof(this->udp.tx_addr)
       );
-
-      for (int i = 0; i < this->reg_txsize; i++) {
-        printf("%c", this->tx_fifo.front());
-        this->tx_fifo.pop();
-      }
-      printf("\n");
 
       this->reg_tx_status = 0x01;
       this->tx_flag = 0;
@@ -94,48 +88,51 @@ void sim_udp_t::udp_send() {
   }
 }
 
-void sim_udp_t::udp_create_socket() {
-  // Create socket file descriptor
-  if ((this->udp.sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-    printf("<SimUDP> [ERROR]: socket creation failed\n");
-  }
-  printf("<SimUDP> [INFO]: socket created\n");
-}
-
 void sim_udp_t::udp_enable() {
-  this->enabled = 1;
-  if (bind(this->udp.sockfd, (const struct sockaddr *)&this->udp.rx_addr, sizeof(this->udp.rx_addr)) < 0) {
+  if (this->enabled) {
+    return;
+  }
+
+  ssize_t status = bind(this->udp.sockfd, (const struct sockaddr *)&this->udp.rx_addr, sizeof(this->udp.rx_addr));
+  if (status < 0) {
     printf("<SimUDP> [ERROR]: bind failed\n");
   }
   printf("<SimUDP> [INFO]: bind success\n");
-}
+  this->enabled = 1;
 
-void sim_udp_t::udp_set_rx_flag() {
-  this->rx_flag = 1;
-}
-
-void sim_udp_t::udp_set_tx_flag() {
-  this->tx_flag = 1;
 }
 
 bool sim_udp_t::load(reg_t addr, size_t len, uint8_t* bytes) {
+  // if illegal address or length, return false
   if (addr >= 0x1000 || len > 4) return false;
+
   uint32_t r = 0;
   switch (addr) {
     case UDP_RXFIFO_DATA:
-      rx_fifo_mutex.lock();
-      r = this->rx_fifo.front();
-      rx_fifo_mutex.unlock();
+      if (this->rx_fifo.size() == 0) {
+        // set empty flag
+        r = 0x80000000;
+      }
+      else {
+        r = this->rx_fifo.front();
+        this->rx_fifo.pop();
+      }
       break;
-    case UDP_RXFIFO_VALID:
-      r = this->rx_fifo.size() > 0;
+    
+    case UDP_RXFIFO_SIZE:
+      r = this->rx_fifo.size();
       break;
-    case UDP_TXFIFO_READY:
-      r = 1;
+    
+    case UDP_TXFIFO_DATA:
+      r = (this->tx_fifo.size() == FIFO_SIZE ? 0x80000000 : 0x00) | this->tx_fifo.back();
       break;
+    
+    case UDP_TXFIFO_SIZE:
+      r = this->tx_fifo.size();
+      break;
+    
     case UDP_RX_STATUS:
       r = this->reg_rx_status;
-      // printf("UDP_RX_STATUS: %d\n", r);
       break;
     case UDP_TX_STATUS:
       r = this->reg_tx_status;
@@ -143,46 +140,39 @@ bool sim_udp_t::load(reg_t addr, size_t len, uint8_t* bytes) {
     default: printf("LOAD -- ADDR=0x%lx LEN=%lu\n", addr, len); abort();
   }
   memcpy(bytes, &r, len);
-  // printf("LOAD -- ADDR=0x%lx LEN=%lu DATA=%lx\n", addr, len, r);
   return true;
 }
 
 bool sim_udp_t::store(reg_t addr, size_t len, const uint8_t* bytes) {
-  // printf("STORE -- ADDR=0x%lx LEN=%lu DATA=%lx\n", addr, len, *(uint32_t *)bytes);
-  
+  // if illegal address or length, return false
   if (addr >= 0x1000 || len > 4) return false;
   
   switch (addr) {
     case UDP_RXIP:
       this->udp.rx_addr.sin_addr.s_addr = *((uint32_t *)bytes);
-      printf("UDP_RXIP: %s\n", inet_ntoa(this->udp.rx_addr.sin_addr));
       return true;
 
     case UDP_TXIP:
       this->udp.tx_addr.sin_addr.s_addr = *((uint32_t *)bytes);
-      printf("UDP_TXIP: %s\n", inet_ntoa(this->udp.tx_addr.sin_addr));
       return true;
     
     case UDP_RXPORT: 
       this->udp.rx_addr.sin_port = *((uint16_t *)bytes);
-      printf("UDP_RXPORT: %d\n", ntohs(this->udp.rx_addr.sin_port));
       return true;
     
     case UDP_TXPORT:
       this->udp.tx_addr.sin_port = *((uint16_t *)bytes);
-      printf("UDP_TXPORT: %d\n", ntohs(this->udp.tx_addr.sin_port));
-      printf("UDP_RXPORT: %d\n", ntohs(this->udp.rx_addr.sin_port));
       return true;
     
     case UDP_CTRL:
-      if (bytes[0] & (1 << 0)) {
+      if (READ_BITS(bytes[0], (1 << 0))) {
         this->udp_enable();
       }
-      if (bytes[0] & (1 << 1)) {
-        this->udp_set_rx_flag();
+      if (READ_BITS(bytes[0], (1 << 1))) {
+        this->rx_flag = 1;
       }
-      if (bytes[0] & (1 << 2)) {
-        this->udp_set_tx_flag();
+      if (READ_BITS(bytes[0], (1 << 2))) {
+        this->tx_flag = 1;
       }
       return true;
     
@@ -194,18 +184,8 @@ bool sim_udp_t::store(reg_t addr, size_t len, const uint8_t* bytes) {
       this->reg_txsize       = *((uint32_t *)bytes); 
       return true;
     
-    case UDP_RXFIFO_READY:
-      rx_fifo_mutex.lock();
-      this->rx_fifo.pop();
-      rx_fifo_mutex.unlock();
-      return true;
-
     case UDP_TXFIFO_DATA:
-      this->tx_fifo_to_push = bytes[0];
-      return true;
-    
-    case UDP_TXFIFO_VALID:
-      this->tx_fifo.push(this->tx_fifo_to_push);
+      this->tx_fifo.push(bytes[0]);
       return true;
     
     case UDP_RX_STATUS:
