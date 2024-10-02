@@ -9,10 +9,10 @@ bool trace_encoder_ctrl_t::load(reg_t addr, size_t len, uint8_t* bytes) {
 }
 
 bool trace_encoder_ctrl_t::store(reg_t addr, size_t len, const uint8_t* bytes) {
-    printf("[TRACE_ENCODER_CTRL]: Storing %d bytes with value %lx to 0x%lx\n", len, bytes[0], addr);
+    // printf("[TRACE_ENCODER_CTRL]: Storing %d bytes with value %lx to 0x%lx\n", len, bytes[0], addr);
     switch (addr) {
         case TR_TE_CTRL:
-            printf("[TRACE_ENCODER_CTRL]: Setting enable to %d\n", (bytes[0] >> 1) & 0x1);
+            // printf("[TRACE_ENCODER_CTRL]: Setting enable to %d\n", (bytes[0] >> 1) & 0x1);
             this->encoder->set_enable((bytes[0] >> 1) & 0x1); // Set enable to the second bit
             return true;
         default:
