@@ -7,7 +7,7 @@
 #include <riscv/sim.h>
 #include <fdt/libfdt.h>
 
-#define TRACE_ENCODER_CTRL_BASE 0x10000000
+#define TRACE_ENCODER_CTRL_BASE 0x3000000
 #define TRACE_ENCODER_CTRL_SIZE 0x1000
 
 #define TR_TE_CTRL 0x000
