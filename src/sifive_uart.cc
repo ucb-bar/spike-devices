@@ -22,10 +22,23 @@ bool sifive_uart_t::store(reg_t addr, size_t len, const uint8_t* bytes) {
   if (addr >= 0x1000 || len > 4) return false;
   switch (addr) {
   case UART_TXFIFO: canonical_terminal_t::write(*bytes); return true;
-  case UART_TXCTRL: memcpy(&txctrl, bytes, len); return true;
-  case UART_RXCTRL: memcpy(&rxctrl, bytes, len); return true;
-  case UART_IE:     memcpy(&ie, bytes, len); update_interrupts(); return true;
-  case UART_DIV:    memcpy(&div, bytes, len); return true;
+  case UART_TXCTRL:
+      memcpy(&txctrl, bytes, len);
+      printf("STORE -- TXCTRL: 0x%lx\n", txctrl);
+      return true;
+  case UART_RXCTRL:
+      memcpy(&rxctrl, bytes, len);
+      printf("STORE -- RXCTRL: 0x%lx\n", rxctrl);
+      return true;
+  case UART_IE:
+      memcpy(&ie, bytes, len);
+      printf("STORE -- IE: 0x%lx\n", ie);
+      update_interrupts();
+      return true;
+  case UART_DIV:
+      memcpy(&div, bytes, len);
+      printf("STORE -- DIV: 0x%lx\n", div);
+      return true;
   default: printf("STORE -- ADDR=0x%lx LEN=%lu\n", addr, len); abort();
   }
 }
