@@ -23,7 +23,7 @@
 
 #define MAX_REQUEST_LENGTH 16
 
-/* #define DEBUG_BLKDEV */
+// #define DEBUG_BLKDEV
 
 #ifdef DEBUG_BLKDEV
 #define blkdev_printf(...)       \
@@ -59,9 +59,11 @@ iceblk_t::iceblk_t(
     std::string img_path = it->second;
     FILE* fp = fopen(img_path.c_str(), "r");
     if (fp == nullptr) {
-      printf("Error opening file %s\n", img_path);
+      blkdev_printf("Error opening file %s\n", img_path.c_str());
       exit(1);
     }
+
+    blkdev_printf("USING: %s\n", img_path.c_str());
 
     fseek(fp, 0, SEEK_END);
     uint64_t img_sz = ftell(fp);
@@ -89,6 +91,7 @@ void iceblk_t::handle_request() {
   if (req_write) handle_write_request();
   else handle_read_request();
   intctrl->set_interrupt_level(interrupt_id, 1);
+  blkdev_printf("SET_INT\n");
 }
 
 void iceblk_t::handle_read_request() {
@@ -143,12 +146,15 @@ bool iceblk_t::load(reg_t addr, size_t len, uint8_t* bytes) {
   int tag;
   switch (addr) {
     case BLKDEV_REQUEST:
+      blkdev_printf("LOAD -- BLKDEV_REQUEST\n");
       post_request();
       break;
     case BLKDEV_NREQUEST:
+      blkdev_printf("LOAD -- NREQ: %d\n", idle_tags.size());
       read_little_endian_reg((int)idle_tags.size(), 0, len, bytes);
       break;
     case BLKDEV_NCOMPLETE:
+      blkdev_printf("LOAD -- NCOMP: %d\n", cmpl_tags.size());
       read_little_endian_reg((int)cmpl_tags.size(), 0, len, bytes);
       break;
     case BLKDEV_COMPLETE:
@@ -161,14 +167,18 @@ bool iceblk_t::load(reg_t addr, size_t len, uint8_t* bytes) {
       // lower interrupt when there is no longer completed reqs
       cmpl_tags.pop();
       idle_tags.push(tag);
+      blkdev_printf("LOAD -- COMPLETE: 0x%lx (left:%d)\n", tag, cmpl_tags.size());
       if ((int)cmpl_tags.size() == 0) {
         intctrl->set_interrupt_level(interrupt_id, 0);
+        blkdev_printf("UNSET_INT\n");
       }
       break;
     case BLKDEV_NSECTORS:
+      blkdev_printf("LOAD -- NSEC: %d\n", blockdevice_size / BLKDEV_SECTOR_SIZE);
       read_little_endian_reg((int)(blockdevice_size / BLKDEV_SECTOR_SIZE), 0, len, bytes);
       break;
     case BLKDEV_MAX_REQUEST_LENGTH:
+      blkdev_printf("LOAD -- MAXREQLEN: %d\n", MAX_REQUEST_LENGTH);
       read_little_endian_reg((int)(MAX_REQUEST_LENGTH), 0, len, bytes);
       break;
     default:
@@ -180,18 +190,31 @@ bool iceblk_t::load(reg_t addr, size_t len, uint8_t* bytes) {
 bool iceblk_t::store(reg_t addr, size_t len, const uint8_t* bytes) {
   if (len > 8) return false;
 
+  reg_t old_req_addr = req_addr;
+  reg_t old_req_offset = req_offset;
+  reg_t old_req_len = req_len;
+  reg_t old_req_write = req_write;
+
   switch (addr) {
     case BLKDEV_ADDR:
       write_little_endian_reg(&req_addr, 0, len, bytes);
+      if (old_req_addr != req_addr)
+        blkdev_printf("STORE -- BLKDEV_ADDR: 0x%lx\n", req_addr);
       break;
     case BLKDEV_OFFSET:
       write_little_endian_reg(&req_offset, 0, len, bytes);
+      if (old_req_offset != req_offset)
+        blkdev_printf("STORE -- BLKDEV_OFFSET: 0x%lx\n", req_offset);
       break;
     case BLKDEV_LEN:
       write_little_endian_reg(&req_len, 0, len, bytes);
+      if (old_req_len != req_len)
+        blkdev_printf("STORE -- BLKDEV_LEN: 0x%lx\n", req_len);
       break;
     case BLKDEV_WRITE:
       write_little_endian_reg(&req_write, 0, len, bytes);
+      if (old_req_write != req_write)
+        blkdev_printf("STORE -- BLKDEV_WRITE: 0x%lx\n", req_write);
       break;
     default:
       return false;
@@ -206,6 +229,7 @@ void iceblk_t::tick(reg_t rtc_ticks) {
 
   if (cur_tick > 0 || pending_tags.empty()) return;
 
+  blkdev_printf("HANDLE_REQ\n");
   handle_request();
   cmpl_tags.push(pending_tags.front());
   pending_tags.pop();
