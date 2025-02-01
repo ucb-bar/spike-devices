@@ -21,6 +21,10 @@ bool trace_encoder_ctrl_t::store(reg_t addr, size_t len, const uint8_t* bytes) {
             printf("[TRACE_ENCODER_CTRL]: Setting enable to %d\n", (bytes[0] >> 1) & 0x1);
             this->encoder->set_enable((bytes[0] >> 1) & 0x1); // Set enable to the second bit
             return true;
+        case TR_TE_TARGET:
+            // printf("[TRACE_ENCODER_CTRL]: Setting enable to %d\n", (bytes[0] >> 1) & 0x1);
+            // this->encoder->set_enable((bytes[0] >> 1) & 0x1);
+            return true;
         default:
             return false;
     }
