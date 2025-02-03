@@ -1,1 +1,3 @@
 libspikedevices.so
+*.log
+*.bin
