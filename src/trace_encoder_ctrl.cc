@@ -25,6 +25,10 @@ bool trace_encoder_ctrl_t::store(reg_t addr, size_t len, const uint8_t* bytes) {
             // printf("[TRACE_ENCODER_CTRL]: Setting enable to %d\n", (bytes[0] >> 1) & 0x1);
             // this->encoder->set_enable((bytes[0] >> 1) & 0x1);
             return true;
+        case TR_TE_BR_MODE:
+            printf("[TRACE_ENCODER_CTRL]: Setting br_mode to %d\n", bytes[0]);
+            this->encoder->set_br_mode(static_cast<br_mode_t>(bytes[0]));
+            return true;
         default:
             return false;
     }
