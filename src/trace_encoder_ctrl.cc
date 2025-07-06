@@ -1,6 +1,6 @@
 #include "trace_encoder_ctrl.h"
 
-trace_encoder_ctrl_t::trace_encoder_ctrl_t(trace_encoder_e* encoder) {
+trace_encoder_ctrl_t::trace_encoder_ctrl_t(abstract_trace_encoder_t* encoder) {
   this->encoder = encoder;
 }
 
