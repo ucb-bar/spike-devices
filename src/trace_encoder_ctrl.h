@@ -2,7 +2,8 @@
 #define _TRACE_ENCODER_CTRL_H
 
 #include <riscv/abstract_device.h>
-#include <riscv/trace_encoder_l.h>
+// #include <riscv/trace_encoder_l.h>
+#include <riscv/trace_encoder_e.h>
 #include <riscv/dts.h>
 #include <riscv/sim.h>
 #include <fdt/libfdt.h>
@@ -17,11 +18,11 @@
 
 class trace_encoder_ctrl_t : public abstract_device_t {
 public:
-    trace_encoder_ctrl_t(trace_encoder_l* encoder);
+    trace_encoder_ctrl_t(trace_encoder_e* encoder);
     bool load(reg_t addr, size_t len, uint8_t* bytes) override;
     bool store(reg_t addr, size_t len, const uint8_t* bytes) override;
 private:
-    trace_encoder_l* encoder;
+    trace_encoder_e* encoder;
 };
 
 #endif
