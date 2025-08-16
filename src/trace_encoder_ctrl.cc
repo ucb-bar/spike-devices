@@ -55,7 +55,7 @@ int trace_encoder_ctrl_parseFDT(const void *fdt, reg_t *address,
 trace_encoder_ctrl_t* trace_encoder_ctrl_parseFromFDT(const void* fdt, const sim_t* sim, reg_t* base, std::vector<std::string> sargs) {
   if (trace_encoder_ctrl_parseFDT(fdt, base, "ucbbar,trace_encoder_ctrl") == 0) {
     printf("Found trace_encoder_ctrl at 0x%lx\n", *base);
-    return new trace_encoder_ctrl_t(&(const_cast<sim_t*>(sim)->get_core(0)->trace_encoder));
+    return new trace_encoder_ctrl_t((const_cast<sim_t*>(sim)->get_core(0)->trace_encoder));
   } else {
     return nullptr;
   }
