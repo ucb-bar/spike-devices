@@ -21,13 +21,21 @@ bool trace_encoder_ctrl_t::store(reg_t addr, size_t len, const uint8_t* bytes) {
             printf("[TRACE_ENCODER_CTRL]: Setting enable to %d\n", (bytes[0] >> 1) & 0x1);
             this->encoder->set_enable((bytes[0] >> 1) & 0x1); // Set enable to the second bit
             return true;
-        case TR_TE_TARGET:
-            // printf("[TRACE_ENCODER_CTRL]: Setting enable to %d\n", (bytes[0] >> 1) & 0x1);
-            // this->encoder->set_enable((bytes[0] >> 1) & 0x1);
+        case TR_TE_SINK:
+            printf("[TRACE_ENCODER_CTRL]: IGNORING sink setting to %d\n", (bytes[0] >> 1) & 0x1);
             return true;
         case TR_TE_BR_MODE:
             printf("[TRACE_ENCODER_CTRL]: Setting br_mode to %d\n", bytes[0]);
             this->encoder->set_br_mode(static_cast<br_mode_t>(bytes[0]));
+            return true;
+        case TR_TE_CTX_MODE:
+            printf("[TRACE_ENCODER_CTRL]: Setting ctx_mode to %d\n", bytes[0]);
+            this->encoder->set_ctx_mode(static_cast<ctx_mode_t>(bytes[0]));
+            return true;
+        case TR_TE_CTX_ASID:
+            uint32_t ctx_id = bytes[3] << 24 | bytes[2] << 16 | bytes[1] << 8 | bytes[0];
+            printf("[TRACE_ENCODER_CTRL]: Setting ctx_id to %d\n", ctx_id);
+            this->encoder->set_ctx_id(ctx_id);
             return true;
         default:
             return false;

@@ -12,8 +12,10 @@
 
 #define TR_TE_CTRL 0x000
 #define TR_TE_IMPL 0x004
-#define TR_TE_TARGET 0x020
+#define TR_TE_SINK 0x020
 #define TR_TE_BR_MODE 0x024
+#define TR_TE_CTX_MODE 0x040
+#define TR_TE_CTX_ASID 0x044
 
 class trace_encoder_ctrl_t : public abstract_device_t {
 public:
