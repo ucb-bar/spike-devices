@@ -1,11 +1,18 @@
 #include <cstdint>
 #include <cstdio>
-#include <stdlib.h>
+#include <cstdlib>
 #include <sys/time.h>
 #include <sstream>
-#include <stddef.h>
+#include <cstddef>
 #include <vector>
 #include <map>
+#include <algorithm>
+#include <cctype>
+#include <cerrno>
+#include <cstring>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
 #include "iceblk.h"
 
 #define BLKDEV_ADDR      0
@@ -46,33 +53,125 @@ iceblk_t::iceblk_t(
   for (auto arg : sargs) {
     size_t eq_idx = arg.find('=');
     if (eq_idx != std::string::npos) {
-      argmap.insert(std::pair<std::string, std::string>(arg.substr(0, eq_idx), arg.substr(eq_idx+1)));
+      argmap.emplace(arg.substr(0, eq_idx), arg.substr(eq_idx + 1));
+    } else {
+      argmap.emplace(arg, "");
     }
   }
 
+  auto persistent = argmap.find("iceblk-persistent-modification");
+  if (persistent != argmap.end()) {
+    std::string val = persistent->second;
+    std::transform(val.begin(), val.end(), val.begin(), [](unsigned char c) {
+      return static_cast<char>(std::tolower(c));
+    });
+    persistent_modification = val.empty() || val == "1" || val == "true" ||
+                              val == "yes" || val == "on";
+    fprintf(stderr, "ICEBLK: Persistent modification is %s\n",
+            persistent_modification ? "enabled" : "disabled");
+  }
 
-  auto it = argmap.find("img");
-  if (it == argmap.end()) {
-    blockdevice_size = (sizeof(uint64_t)/sizeof(uint8_t)) * BLKDEV_SECTOR_SIZE * 8;
-    blockdevice = (uint64_t*)malloc(sizeof(uint64_t) * blockdevice_size);
-  } else {
-    std::string img_path = it->second;
-    FILE* fp = fopen(img_path.c_str(), "r");
-    if (fp == nullptr) {
-      printf("Error opening file %s\n", img_path);
-      exit(1);
+  auto img_it = argmap.find("img");
+  if (persistent_modification && img_it == argmap.end()) {
+    fprintf(stderr, "ICEBLK: Persistent modification requested without image; disabling persistence.\n");
+    persistent_modification = false;
+  }
+
+  if (img_it == argmap.end()) {
+    blockdevice_size = BLKDEV_SECTOR_SIZE * 8;
+    blockdevice = static_cast<uint64_t*>(std::malloc(blockdevice_size));
+    if (!blockdevice) {
+      perror("iceblk malloc");
+      std::exit(1);
     }
+    std::memset(blockdevice, 0, blockdevice_size);
+  } else {
+    const std::string& img_path = img_it->second;
+    if (persistent_modification) {
+      fprintf(stderr, "ICEBLK: Persistent modification enabled; using mmap on %s\n", img_path.c_str());
+      int fd = ::open(img_path.c_str(), O_RDWR);
+      if (fd == -1) {
+        perror("iceblk open");
+        std::exit(1);
+      }
 
-    fseek(fp, 0, SEEK_END);
-    uint64_t img_sz = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
+      off_t img_sz = ::lseek(fd, 0, SEEK_END);
+      if (img_sz == -1) {
+        perror("iceblk lseek");
+        ::close(fd);
+        std::exit(1);
+      }
 
-    uint64_t sectors_in_img = (img_sz + BLKDEV_SECTOR_SIZE) / BLKDEV_SECTOR_SIZE;
-    blockdevice_size = sectors_in_img * BLKDEV_SECTOR_SIZE;
-    blockdevice = (uint64_t*)malloc(blockdevice_size);
+      if (img_sz == 0) {
+        img_sz = BLKDEV_SECTOR_SIZE * 8;
+        if (::ftruncate(fd, img_sz) != 0) {
+          perror("iceblk ftruncate");
+          ::close(fd);
+          std::exit(1);
+        }
+      }
 
-    fread((void*)blockdevice, sizeof(uint64_t), img_sz/sizeof(uint64_t), fp);
-    fclose(fp);
+      if (::lseek(fd, 0, SEEK_SET) == -1) {
+        perror("iceblk lseek");
+        ::close(fd);
+        std::exit(1);
+      }
+
+      blockdevice_size = static_cast<uint64_t>(img_sz);
+      void* mapped = ::mmap(nullptr, blockdevice_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+      if (mapped == MAP_FAILED) {
+        perror("iceblk mmap");
+        ::close(fd);
+        std::exit(1);
+      }
+      blockdevice = static_cast<uint64_t*>(mapped);
+      ::close(fd);
+    } else {
+      FILE* fp = std::fopen(img_path.c_str(), "rb");
+      if (fp == nullptr) {
+        std::fprintf(stderr, "Error opening file %s\n", img_path.c_str());
+        std::exit(1);
+      }
+
+      if (std::fseek(fp, 0, SEEK_END) != 0) {
+        std::fprintf(stderr, "ICEBLK: Failed to seek %s\n", img_path.c_str());
+        std::fclose(fp);
+        std::exit(1);
+      }
+      long img_sz = std::ftell(fp);
+      if (img_sz < 0) {
+        std::fprintf(stderr, "ICEBLK: Failed to determine size of %s\n", img_path.c_str());
+        std::fclose(fp);
+        std::exit(1);
+      }
+      if (std::fseek(fp, 0, SEEK_SET) != 0) {
+        std::fprintf(stderr, "ICEBLK: Failed to rewind %s\n", img_path.c_str());
+        std::fclose(fp);
+        std::exit(1);
+      }
+
+      uint64_t sectors_in_img = (static_cast<uint64_t>(img_sz) + BLKDEV_SECTOR_SIZE - 1) / BLKDEV_SECTOR_SIZE;
+      blockdevice_size = sectors_in_img * BLKDEV_SECTOR_SIZE;
+      blockdevice = static_cast<uint64_t*>(std::malloc(blockdevice_size));
+      if (!blockdevice) {
+        perror("iceblk malloc");
+        std::fclose(fp);
+        std::exit(1);
+      }
+
+      size_t read_bytes = std::fread(reinterpret_cast<uint8_t*>(blockdevice), 1, static_cast<size_t>(img_sz), fp);
+      if (read_bytes != static_cast<size_t>(img_sz)) {
+        std::fprintf(stderr, "ICEBLK: Short read when loading %s\n", img_path.c_str());
+        std::fclose(fp);
+        std::free(blockdevice);
+        std::exit(1);
+      }
+      if (blockdevice_size > static_cast<uint64_t>(img_sz)) {
+        std::memset(reinterpret_cast<uint8_t*>(blockdevice) + img_sz, 0,
+                    blockdevice_size - static_cast<uint64_t>(img_sz));
+      }
+      std::fclose(fp);
+    }
   }
 
   for (int i = 0; i < trackers; i++) {
@@ -81,7 +180,19 @@ iceblk_t::iceblk_t(
 }
 
 iceblk_t::~iceblk_t() {
-  free(blockdevice);
+  if (persistent_modification) {
+    void* mapping = reinterpret_cast<void*>(blockdevice);
+    if (mapping && mapping != MAP_FAILED) {
+      if (::msync(mapping, blockdevice_size, MS_SYNC) != 0) {
+        perror("iceblk msync");
+      }
+      if (::munmap(mapping, blockdevice_size) != 0) {
+        perror("iceblk munmap");
+      }
+    }
+  } else if (blockdevice) {
+    std::free(blockdevice);
+  }
 }
 
 void iceblk_t::handle_request() {
@@ -117,7 +228,7 @@ void iceblk_t::handle_write_request() {
   for (reg_t sidx = 0; sidx < req_len; sidx++) {
     for (reg_t i = 0; i < BLKDEV_SECTOR_SIZE; i+= 8) {
       uint64_t data = simdram->load<uint64_t>(req_addr + sidx * BLKDEV_SECTOR_SIZE + i);
-      write_blockdevice_u64(data, sidx, i);
+      write_blockdevice_u64(data, sidx + req_offset, i);
     }
   }
 }

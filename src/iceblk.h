@@ -46,6 +46,8 @@ private:
   uint64_t* blockdevice;
   uint64_t blockdevice_size;
 
+  bool persistent_modification = false;
+
   const simif_t* sim;
   abstract_interrupt_controller_t *intctrl;
   uint32_t interrupt_id;
