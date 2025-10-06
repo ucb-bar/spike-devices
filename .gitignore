@@ -4,3 +4,4 @@ libspikedevices.so
 *.debug
 *.out
 *.elf
+.vscode
