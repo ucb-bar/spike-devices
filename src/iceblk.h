@@ -29,6 +29,7 @@ public:
   ~iceblk_t();
   bool load(reg_t addr, size_t len, uint8_t* bytes) override;
   bool store(reg_t addr, size_t len, const uint8_t* bytes) override;
+  reg_t size() override { return BLKDEV_SIZE; }
   void tick(reg_t rtc_ticks) override;
 
 private:

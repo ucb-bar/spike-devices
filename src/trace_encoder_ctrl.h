@@ -22,6 +22,7 @@ public:
     trace_encoder_ctrl_t(abstract_trace_encoder_t* encoder);
     bool load(reg_t addr, size_t len, uint8_t* bytes) override;
     bool store(reg_t addr, size_t len, const uint8_t* bytes) override;
+    reg_t size() override { return TRACE_ENCODER_CTRL_SIZE; }
 private:
     abstract_trace_encoder_t* encoder;
 };
