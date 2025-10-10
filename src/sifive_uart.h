@@ -21,6 +21,8 @@
 #define UART_WIRE4  (0x20)
 #define UART_EITHER8OR9 (0x24)
 
+#define UART_SIZE 0x100
+
 #define UART_GET_TXCNT(txctrl)   ((txctrl >> 16) & 0x7)
 #define UART_GET_RXCNT(rxctrl)   ((rxctrl >> 16) & 0x7)
 #define UART_RX_FIFO_SIZE (8)
@@ -38,6 +40,7 @@ public:
 
   bool load(reg_t addr, size_t len, uint8_t* bytes) override;
   bool store(reg_t addr, size_t len, const uint8_t* bytes) override;
+  reg_t size() override { return UART_SIZE; }
   void tick(reg_t UNUSED rtc_ticks) override;
 
 private:

@@ -1,1 +1,7 @@
 libspikedevices.so
+*.log
+*.bin
+*.debug
+*.out
+*.elf
+.vscode

@@ -29,6 +29,7 @@ public:
   ~iceblk_t();
   bool load(reg_t addr, size_t len, uint8_t* bytes) override;
   bool store(reg_t addr, size_t len, const uint8_t* bytes) override;
+  reg_t size() override { return BLKDEV_SIZE; }
   void tick(reg_t rtc_ticks) override;
 
 private:
@@ -45,6 +46,8 @@ private:
   uint64_t cur_tick = 0;
   uint64_t* blockdevice;
   uint64_t blockdevice_size;
+
+  bool persistent_modification = false;
 
   const simif_t* sim;
   abstract_interrupt_controller_t *intctrl;
