@@ -59,7 +59,7 @@ iceblk_t::iceblk_t(
     std::string img_path = it->second;
     FILE* fp = fopen(img_path.c_str(), "r");
     if (fp == nullptr) {
-      printf("Error opening file %s\n", img_path);
+      printf("Error opening file %s\n", img_path.c_str());
       exit(1);
     }
 
