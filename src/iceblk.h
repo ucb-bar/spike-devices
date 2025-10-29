@@ -30,6 +30,7 @@ public:
   bool load(reg_t addr, size_t len, uint8_t* bytes) override;
   bool store(reg_t addr, size_t len, const uint8_t* bytes) override;
   void tick(reg_t rtc_ticks) override;
+  reg_t size() override { return PGSIZE; }
 
 private:
   void post_request();
