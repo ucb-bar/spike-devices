@@ -11,7 +11,7 @@ SRCS=$(wildcard $(SRC_DIR)/*.cc)
 default: libspikedevices.so
 
 libspikedevices.so: $(SRCS)
-	g++ -L $(RISCV)/lib -Wl,-rpath,$(RISCV)/lib -shared -o $@ -std=c++17 -I $(RISCV)/include -fPIC $^
+	g++ -L $(RISCV)/lib -Wl,-rpath,$(RISCV)/lib -shared -o $@ -std=c++20 -I $(RISCV)/include -fPIC $^ -lriscv
 
 .PHONY: install
 install: libspikedevices.so
